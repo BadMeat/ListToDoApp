@@ -7,14 +7,12 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
-class ListTableViewController: UITableViewController {
+class ListTableViewController: DeleteTableViewController {
 
-    var listArray = [List]()
-    let dataPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("ListArray.plist")
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
+    var listArray : Results<Item>?
     
     var selectedCategory : Category?{
         didSet{
@@ -24,7 +22,6 @@ class ListTableViewController: UITableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        print(dataPath!)
     }
 
     // MARK: - Table view data source
@@ -32,13 +29,17 @@ class ListTableViewController: UITableViewController {
         var field = UITextField()
         let alert = UIAlertController(title:  "List", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add", style: .default) { (action) in
-            let list = List(context: self.context)
-            list.title = field.text!
-            list.done = false
-            list.parentCategory = self.selectedCategory
-            self.listArray.append(list)
-            
-            self.saveEncoder()
+            if let currentCat = self.selectedCategory{
+                do{
+                    try self.realm.write {
+                        let list = Item()
+                        list.title = field.text!
+                        currentCat.items.append(list)
+                    }
+                }catch{
+                    print("Save Context Error = \(error)")
+                }
+            }
             
             self.tableView.reloadData()
         }
@@ -51,65 +52,59 @@ class ListTableViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         // #warning Incomplete implementation, return the number of rows
-        return listArray.count
+        return listArray?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "listCell", for: indexPath)
-        cell.textLabel?.text = listArray[indexPath.row].title
-        
-        cell.accessoryType = listArray[indexPath.row].done ? .checkmark : .none
-        
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+        if let item = listArray?[indexPath.row]{
+            cell.textLabel?.text = item.title
+            cell.accessoryType = item.done ? .checkmark : .none
+        }else{
+            cell.textLabel?.text = "No Item Added"
+        }
         return cell
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        listArray[indexPath.row].done = !listArray[indexPath.row].done
-//        context.delete(listArray[indexPath.row])
-//        listArray.remove(at: indexPath.row)
-        self.saveEncoder()
+        if let done = listArray?[indexPath.row]{
+            do{
+                try realm.write {
+                    done.done = !done.done
+                }
+            }catch{
+                print(error)
+            }
+        }
         tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
-    func saveEncoder(){
-        do{
-            try context.save()
-        }catch{
-            print("Save Context Error = \(error)")
-        }
+    func loadData(){
+        listArray = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
+        tableView.reloadData()
     }
     
-    func loadData(with request : NSFetchRequest<List> = List.fetchRequest(), predicate : NSPredicate? = nil){
-        if let pr = selectedCategory?.name{
-            print("category = \(pr)")
+    override func deleteData(index: IndexPath) {
+        if let currentItem = listArray?[index.row]{
+            do{
+                try realm.write {
+                    realm.delete(currentItem)
+                }
+            }catch{
+                print("error delete \(error)")
+            }
         }
-        
-        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
-        if let additionalPredicate = predicate{
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate,additionalPredicate])
-        }else{
-            request.predicate = categoryPredicate
-        }
-        
-        do{
-            listArray = try context.fetch(request)
-        }catch{
-            print("Error load = \(error)")
-        }
-        tableView.reloadData()
     }
 }
 
 extension ListTableViewController : UISearchBarDelegate{
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        let request : NSFetchRequest<List> = List.fetchRequest()
-        let predicate = NSPredicate(format: "title CONTAINS [cd]%@", searchBar.text!)
-        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-        loadData(with: request,predicate: predicate)
+        listArray = listArray?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "title", ascending: true)
+        tableView.reloadData()
     }
-    
+
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchBar.text?.count == 0{
             loadData()

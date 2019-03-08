@@ -8,6 +8,7 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
 class CategoryTableViewController: DeleteTableViewController {
 
@@ -17,6 +18,7 @@ class CategoryTableViewController: DeleteTableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.separatorStyle = .none
         loadData()
     }
 
@@ -28,6 +30,7 @@ class CategoryTableViewController: DeleteTableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
         cell.textLabel?.text = categoryArray?[indexPath.row].name ?? "No Category added"
+        cell.backgroundColor = UIColor(hexString: categoryArray?[indexPath.row].color ?? "#44755d")
         return cell
     }
     
@@ -48,6 +51,7 @@ class CategoryTableViewController: DeleteTableViewController {
         let action = UIAlertAction(title: "Add", style: .default) { (action) in
             let cat = Category()
             cat.name = textField.text!
+            cat.color = UIColor.randomFlat.hexValue()
             self.saveData(category: cat)
         }
         alert.addAction(action)

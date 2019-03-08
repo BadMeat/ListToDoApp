@@ -8,6 +8,7 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
 class ListTableViewController: DeleteTableViewController {
 
@@ -20,8 +21,32 @@ class ListTableViewController: DeleteTableViewController {
         }
     }
     
+    @IBOutlet weak var searchBarOutlet: UISearchBar!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.separatorStyle = .none
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        title = selectedCategory?.name ?? "No Name"
+        guard let navbar = navigationController?.navigationBar else {fatalError("cant load nav bar")}
+        guard let barColor = UIColor(hexString: selectedCategory?.color ?? "#44755d")else{fatalError("Cannot get bar color")}
+        navbar.barTintColor = barColor
+        navbar.tintColor = ContrastColorOf(barColor, returnFlat: true)
+        searchBarOutlet.barTintColor = barColor
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        updateColor(hexCode: "#44755d")
+    }
+    
+    func updateColor(hexCode : String){
+        guard let navbar = navigationController?.navigationBar else {fatalError("cant load nav bar")}
+        guard let barColor = UIColor(hexString: hexCode)else{fatalError("Cannot get bar color")}
+        navbar.barTintColor = barColor
+        navbar.tintColor = ContrastColorOf(barColor, returnFlat: true)
+        searchBarOutlet.barTintColor = barColor
     }
 
     // MARK: - Table view data source
@@ -60,6 +85,12 @@ class ListTableViewController: DeleteTableViewController {
         if let item = listArray?[indexPath.row]{
             cell.textLabel?.text = item.title
             cell.accessoryType = item.done ? .checkmark : .none
+            if let color = UIColor(hexString: selectedCategory!.color)?.darken(byPercentage:
+            CGFloat(indexPath.row)/CGFloat(listArray!.count)
+                ){
+                cell.backgroundColor = color
+                cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
+            }
         }else{
             cell.textLabel?.text = "No Item Added"
         }
